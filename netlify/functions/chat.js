@@ -1,19 +1,15 @@
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-
+ 
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: { message: 'API ключ Groq не настроен на сервере' } })
-    };
+    return res.status(500).json({ error: { message: 'API ключ не настроен' } });
   }
-
+ 
   try {
-    const body = JSON.parse(event.body);
-
+    const body = req.body;
     const messages = [];
     if (body.system) messages.push({ role: 'system', content: body.system });
     for (const m of (body.messages || [])) {
@@ -22,7 +18,7 @@ exports.handler = async (event) => {
         content: typeof m.content === 'string' ? m.content : m.content.map(c => c.text || '').join('')
       });
     }
-
+ 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -36,28 +32,17 @@ exports.handler = async (event) => {
         temperature: 0.9
       })
     });
-
+ 
     const data = await response.json();
-
     if (data.error) {
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: { message: data.error.message } })
-      };
+      return res.status(400).json({ error: { message: data.error.message } });
     }
-
+ 
     const text = data.choices?.[0]?.message?.content || 'Нет ответа';
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ content: [{ type: 'text', text }] })
-    };
-
+    res.status(200).json({ content: [{ type: 'text', text }] });
+ 
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: { message: err.message } })
-    };
+    res.status(500).json({ error: { message: err.message } });
   }
-};
+}
+ 
