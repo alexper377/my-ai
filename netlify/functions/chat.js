@@ -2,46 +2,43 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
- 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
+
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  if (!GROQ_API_KEY) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: { message: 'API ключ Gemini не настроен на сервере' } })
+      body: JSON.stringify({ error: { message: 'API ключ Groq не настроен на сервере' } })
     };
   }
- 
+
   try {
     const body = JSON.parse(event.body);
- 
-    const systemPrompt = body.system || '';
-    const messages = body.messages || [];
- 
-    const geminiMessages = messages.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: typeof m.content === 'string' ? m.content : m.content.map(c => c.text || '').join('') }]
-    }));
- 
-    const geminiBody = {
-      system_instruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
-      contents: geminiMessages,
-      generationConfig: {
-        maxOutputTokens: 1000,
+
+    const messages = [];
+    if (body.system) messages.push({ role: 'system', content: body.system });
+    for (const m of (body.messages || [])) {
+      messages.push({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : m.content.map(c => c.text || '').join('')
+      });
+    }
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        max_tokens: 1000,
         temperature: 0.9
-      }
-    };
- 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiBody)
-      }
-    );
- 
+      })
+    });
+
     const data = await response.json();
- 
+
     if (data.error) {
       return {
         statusCode: 400,
@@ -49,21 +46,14 @@ exports.handler = async (event) => {
         body: JSON.stringify({ error: { message: data.error.message } })
       };
     }
- 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Нет ответа';
-    const anthropicResponse = {
-      content: [{ type: 'text', text }]
-    };
- 
+
+    const text = data.choices?.[0]?.message?.content || 'Нет ответа';
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify(anthropicResponse)
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ content: [{ type: 'text', text }] })
     };
- 
+
   } catch (err) {
     return {
       statusCode: 500,
@@ -71,4 +61,3 @@ exports.handler = async (event) => {
     };
   }
 };
- 
