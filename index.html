@@ -1316,7 +1316,7 @@ let settings = {
   apiKey: ''
 };
 
-const API_URL = "https://api.anthropic.com/v1/messages";
+const API_URL = "/.netlify/functions/chat";
 const MODEL = "claude-sonnet-4-20250514";
 const STORAGE_KEY = 'nikitos_data';
 
@@ -1464,8 +1464,8 @@ async function sendChat() {
     if (searchMode) body.tools = [{ type:"web_search_20250305", name:"web_search" }];
 
     const res = await fetch(API_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await res.json();
